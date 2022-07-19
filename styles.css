@@ -1,0 +1,106 @@
+body {
+  background-color: #2f4f4f;
+  font-family: monospace;
+  color: ivory;
+}
+
+h1 {
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+svg {
+  overflow: hidden;
+  display: inline-block;
+  max-width: 90vw;
+  height: 280px;
+  width: 280px;
+}
+
+svg * {
+  fill: #fffff0;
+}
+
+svg.flashing * {
+  fill: darkseagreen;
+}
+
+svg.gameOver * {
+  fill: lightpink;
+}
+
+#scores {
+  padding: 0.5rem;
+}
+
+#scores p {
+  margin: 0;
+}
+
+#currentScore.flashing {
+  color: darkseagreen;
+}
+
+#map {
+  text-align: center;
+  min-height: 280px;
+  padding-top: 0.5rem;
+}
+
+#main {
+  padding-top: 0.5rem;
+}
+
+#buttons {
+  display: flex;
+  flex-direction: row;
+  justify-content: stretch;
+  text-align: center;
+}
+
+button {
+  padding: 1rem;
+  flex: 1;
+  border: 2px solid ivory;
+  background: transparent;
+  color: lightpink;
+  font-family: monospace;
+  font-size: 1rem;
+  margin-left: 2px;
+}
+
+button.flashing {
+  background: DarkSeaGreen;
+  color: darkslategray;
+}
+
+p {
+  font-size: 1rem;
+}
+
+.startOver {
+  width: 100%;
+}
+
+.startOver p {
+  margin: 0;
+  margin-bottom: 0.5rem;
+}
+
+.startOver button {
+  background-color: lightpink;
+  color: darkslategray;
+}
+
+@media screen and (min-width: 1000px) {
+  svg {
+    height: 500px;
+    width: 500px;
+  }
+
+  #main {
+    padding-top: 3rem;
+  }
+}
