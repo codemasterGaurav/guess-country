@@ -1,0 +1,245 @@
+import countries from "./countries.js";
+
+      const randomlySort = (countries) =>
+        countries
+          .map((c) => [Math.random(), c])
+          .sort(([xa], [xb]) => {
+            return xa - xb;
+          })
+          .map(([_, value]) => value);
+
+      const randomItem = (countries) => randomlySort(countries)[0];
+
+      const update = (model, [action]) => {
+        switch (action) {
+          case "INCORRECT_COUNTRY_NAME_SELECTED":
+            return { ...model, gameOver: true };
+          case "CORRECT_COUNTRY_NAME_SELECTED":
+            return { ...model, flashing: true };
+          case "FLASHED":
+            return {
+              ...model,
+              round: model.round + 1,
+              flashing: false,
+              alternative: randomItem(model.countries.slice(model.round + 2)),
+              correctPosition: randomItem([0, 1]),
+            };
+          default:
+            return model;
+        }
+      };
+
+      const button = (country, clickHandler, isFlashing) => {
+        const b = document.createElement("button");
+        if (isFlashing) {
+          b.className = "flashing";
+        }
+        b.textContent = `${country.name} (${country.countryCode})`;
+        b["data-country"] = country.countryCode;
+        b.onclick = clickHandler;
+        return b;
+      };
+
+      const gameOverText = (score, countryName) => {
+        const container = document.createElement("div");
+        container.className = "startOver";
+
+        const t1 = document.createElement("p");
+        const t2 = document.createElement("p");
+        t1.textContent = `Game Over! The correct answer was ${countryName}.`;
+        t2.textContent = `You guessed ${score} countries correctly.`;
+        container.appendChild(t1);
+        container.appendChild(t2);
+
+        const startOverBtn = document.createElement("button");
+        startOverBtn.textContent = "Start again";
+        startOverBtn.onclick = () => window.location.reload();
+        container.appendChild(startOverBtn);
+
+        return container;
+      };
+
+      const gameCompleteText = (round) => {
+        const t = document.createElement("p");
+        t.textContent = `You win! You guessed ${round} countries correctly.`;
+        return t;
+      };
+
+      const correctCountryWithFlash = () => (signal) =>
+        new Promise((resolve) => {
+          signal(["CORRECT_COUNTRY_NAME_SELECTED"]);
+          setTimeout(() => {
+            resolve();
+          }, 200);
+        });
+
+      const correctCountryNameSelected = () => {
+        return (signal) => {
+          return signal(correctCountryWithFlash()).then(() =>
+            signal(["FLASHED"])
+          );
+        };
+      };
+
+      const incorrectCountryNameSelected =
+        (score) => async (signal, getState) => {
+          signal(["INCORRECT_COUNTRY_NAME_SELECTED"]);
+          const state = getState();
+          const round = state.round;
+          const finalCountry = state.countries[round];
+          await fetch(
+            "https://api.airtable.com/v0/appYTBTUXdLPDXhBT/Table%201",
+            {
+              method: "POST",
+              headers: {
+                Authorization: "Bearer keykaOOkL8hdk60CL", //  api key
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                fields: {
+                  id: Math.random().toString(),
+                  score,
+                  origin: window.location.origin,
+                  finalCountry,
+                },
+              }),
+            }
+          ).catch(console.log);
+        };
+
+      const loadImage = async (
+        countryCode,
+        customSvgParams = {},
+        mapCache,
+        updateCacheFn,
+        isFlashing = false
+      ) => {
+        const text =
+          mapCache[countryCode] ||
+          (await fetchHtml(`./vectors/${countryCode}.svg`));
+        document.querySelector("#map").innerHTML = text;
+        updateCacheFn(countryCode, text);
+        const svg = document.querySelector("svg");
+        svg.viewBox.baseVal.width = customSvgParams.viewBoxWidth || 1000;
+        svg.viewBox.baseVal.height = customSvgParams.viewBoxHeight || 1300;
+        svg.viewBox.baseVal.x = customSvgParams.viewBoxX || 0;
+        svg.viewBox.baseVal.y = customSvgParams.viewBoxY || 0;
+        svg.height.baseVal.value = 400;
+        svg.width.baseVal.value = 400;
+        if (isFlashing) {
+          svg.classList.add("flashing");
+        }
+      };
+
+      const view = async (signal, model, mapCache, updateCacheFn) => {
+        const nextCountry = model.countries[model.round];
+        const nextAlternative = model.alternative;
+        const rootElement = document.getElementById("buttons");
+
+        while (rootElement.firstChild) {
+          rootElement.removeChild(rootElement.firstChild);
+        }
+
+        if (model.gameOver) {
+          document.querySelector("svg").classList.add("gameOver");
+          rootElement.appendChild(
+            gameOverText(model.round, countries[nextCountry].name)
+          );
+          return;
+        }
+
+        if (model.round === model.countries.length - 1) {
+          rootElement.appendChild(gameCompleteText(model.round));
+          return;
+        }
+
+        const onSelectCorrectCountryName = () => {
+          signal(correctCountryNameSelected());
+        };
+
+        const onSelectIncorrectCountryName = () =>
+          signal(incorrectCountryNameSelected(model.round));
+
+        const correctButton = button(
+          countries[nextCountry],
+          onSelectCorrectCountryName,
+          model.flashing
+        );
+        const incorrectButton = button(
+          countries[nextAlternative],
+          onSelectIncorrectCountryName,
+          false
+        );
+
+        const buttons = [
+          model.correctPosition === 0 ? correctButton : incorrectButton,
+          model.correctPosition === 0 ? incorrectButton : correctButton,
+        ];
+
+        buttons.forEach((btn) => rootElement.appendChild(btn));
+
+        if (model.flashing) {
+          document.getElementById("currentScore").textContent = model.round + 1;
+          document.getElementById("currentScore").className = "flashing";
+        } else {
+          document.getElementById("currentScore").className = "";
+          document.getElementById("currentScore").textContent = model.round;
+        }
+
+        await loadImage(
+          nextCountry,
+          countries[nextCountry].customSvg,
+          mapCache,
+          updateCacheFn,
+          model.flashing
+        );
+      };
+
+      async function fetchHtml(filePath) {
+        try {
+          const response = await fetch(filePath);
+          if (!response.ok) {
+            return "";
+          }
+          const text = await response.text();
+          return text;
+        } catch (err) {
+          console.error(err.message);
+          return "";
+        }
+      }
+
+      (async () => {
+        const orderedCountries = randomlySort(Object.keys(countries));
+        let model = {
+          round: 0,
+          gameOver: false,
+          countries: orderedCountries,
+          flashing: false,
+          alternative: randomItem(orderedCountries.slice(1)),
+          correctPosition: randomItem([0, 1]),
+        };
+        let mapCache = {};
+
+        const updateCache = (countryCode, text) => {
+          mapCache = { ...mapCache, [countryCode]: text };
+        };
+
+        const signal = (action) => {
+          if (!Array.isArray(action)) {
+            return action(signal, () => model);
+          }
+          model = update(model, action);
+          view(signal, model, { ...mapCache }, updateCache);
+        };
+
+        view(signal, model, { ...mapCache }, updateCache);
+
+        for (let countryCode of model.countries) {
+          const html = fetchHtml(`./vectors/${countryCode}.svg`).then(
+            (html) => {
+              updateCache(countryCode, html);
+            }
+          );
+        }
+      })();
